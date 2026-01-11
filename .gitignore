@@ -147,6 +147,14 @@ wandb/
 .env
 .autoenv
 
+# TensorBoard logs
+tensorboard/
+**/tensorboard/
+events.out.tfevents.*
+
+# Examples (tutorial notebooks)
+examples/
+
 #Vim
 *.sw?
 
