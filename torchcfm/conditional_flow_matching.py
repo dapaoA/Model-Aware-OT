@@ -640,6 +640,7 @@ class MA_ExactOT(ExactOptimalTransportConditionalFlowMatcher):
         ma_method : str
             Method for the transformation M. Currently supports:
             - "downsample_2x": 2x downsampling (default for ma_tcfm)
+            - "downsample_3x": 3x downsampling (for ma3_tcfm)
             - "low_pass": Low-pass filtering using FFT (filters out 80% high-frequency region)
         """
         super().__init__(sigma)
@@ -649,11 +650,13 @@ class MA_ExactOT(ExactOptimalTransportConditionalFlowMatcher):
     def _get_transformation(self, method: str) -> Callable:
         """Get the transformation function M based on method name."""
         if method == "downsample_2x":
-            return self._downsample_2x
+            return lambda x: self._downsample_nx(x, factor=2)
+        elif method == "downsample_3x":
+            return lambda x: self._downsample_nx(x, factor=3)
         elif method == "low_pass":
             return self._low_pass_filter
         else:
-            raise ValueError(f"Unknown MA method: {method}. Supported methods: ['downsample_2x', 'low_pass']")
+            raise ValueError(f"Unknown MA method: {method}. Supported methods: ['downsample_2x', 'downsample_3x', 'low_pass']")
 
     def _low_pass_filter(self, x: torch.Tensor) -> torch.Tensor:
         """Apply low-pass filter using FFT.
@@ -764,51 +767,62 @@ class MA_ExactOT(ExactOptimalTransportConditionalFlowMatcher):
         # Take real part
         return x_filtered.real
 
-    def _downsample_2x(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply 2x downsampling to the input.
+    def _downsample_nx(self, x: torch.Tensor, factor: int) -> torch.Tensor:
+        """Apply Nx downsampling to the input.
         
-        For image data, downsamples by a factor of 2 in both spatial dimensions.
+        For image data, downsamples by a factor of N in both spatial dimensions.
         For 2D data, returns as is (downsampling not applicable).
         
         Parameters
         ----------
         x : torch.Tensor
             Input tensor of shape (B, C, H, W) for images or (B, D) for 2D data
+        factor : int
+            Downsampling factor (e.g., 2 for 2x, 3 for 3x)
             
         Returns
         -------
         torch.Tensor
-            Downsampled tensor. For images: (B, C, H//2, W//2), for 2D: same as input
+            Downsampled tensor. For images: (B, C, H//factor, W//factor), for 2D: same as input
         """
         if x.dim() == 4:
             # Image data: (B, C, H, W)
-            return self._downsample_2x_image(x)
+            return self._downsample_nx_image(x, factor)
         else:
             # For 2D or other dimensions, return as is
             return x
 
-    def _downsample_2x_image(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply 2x downsampling to image data.
+    def _downsample_nx_image(self, x: torch.Tensor, factor: int) -> torch.Tensor:
+        """Apply Nx downsampling to image data.
         
-        Uses average pooling with kernel size 2 and stride 2 for downsampling.
+        Uses average pooling with kernel size N and stride N for downsampling.
         
         Parameters
         ----------
         x : torch.Tensor
             Input tensor of shape (B, C, H, W)
+        factor : int
+            Downsampling factor (e.g., 2 for 2x, 3 for 3x)
             
         Returns
         -------
         torch.Tensor
-            Downsampled image of shape (B, C, H//2, W//2)
+            Downsampled image of shape (B, C, H//factor, W//factor)
         """
         import torch.nn.functional as F
         
-        # Use average pooling with kernel size 2 and stride 2
-        # This performs 2x downsampling: each output pixel is the average of a 2x2 region
-        x_downsampled = F.avg_pool2d(x, kernel_size=2, stride=2, padding=0)
+        # Use average pooling with kernel size factor and stride factor
+        # This performs Nx downsampling: each output pixel is the average of a NxN region
+        x_downsampled = F.avg_pool2d(x, kernel_size=factor, stride=factor, padding=0)
         
         return x_downsampled
+    
+    def _downsample_2x(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply 2x downsampling to the input (backward compatibility).
+        
+        This method is kept for backward compatibility. It calls _downsample_nx with factor=2.
+        """
+        return self._downsample_nx(x, factor=2)
 
     def sample_location_and_conditional_flow(self, x0, x1, t=None, return_noise=False):
         r"""

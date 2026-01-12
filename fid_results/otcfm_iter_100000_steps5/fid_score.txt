@@ -1,0 +1,4 @@
+FID Score: 63.6582
+Dataset: cifar10
+Num samples: 5000
+Num steps: 5

@@ -37,7 +37,7 @@ def generate_samples(model, dataset_name, device, num_samples, num_steps, save_d
                 x0 = torch.randn(num_samples, 1, 28, 28).to(device)
             
             # Create ODE solver
-            def model_wrapper(t, x):
+            def model_wrapper(t, x, args=None):
                 if t.dim() == 0:
                     t = t.expand(x.shape[0])
                 return model(x, t)
@@ -61,8 +61,8 @@ def generate_samples(model, dataset_name, device, num_samples, num_steps, save_d
             vutils.save_image(samples, grid_path, nrow=10, padding=2)
             print(f"Saved sample grid to {grid_path}")
             
-            # Save individual images
-            for i in range(min(num_samples, 100)):  # Save first 100
+            # Save individual images (save all for FID computation)
+            for i in range(num_samples):
                 img_path = save_dir / f"sample_{i:04d}.png"
                 vutils.save_image(samples[i], img_path)
             
@@ -76,7 +76,7 @@ def generate_samples(model, dataset_name, device, num_samples, num_steps, save_d
                 x0 = sample_8gaussians(num_samples).to(device)
             
             # Create ODE solver
-            def model_wrapper(t, x):
+            def model_wrapper(t, x, args=None):
                 if t.dim() == 0:
                     t = t.expand(x.shape[0])
                 return model(torch.cat([x, t[:, None]], 1))
@@ -123,13 +123,21 @@ def compute_fid(dataset_name, generated_samples_dir, device):
     
     try:
         if dataset_name == 'cifar10':
-            fid_score = fid.compute_fid(
-                str(generated_samples_dir),
-                dataset_name='cifar10',
-                mode='legacy_tensorflow',
-                device=device,
-                num_workers=4,
-            )
+            # Use clean mode with CIFAR-10 (32x32 images)
+            try:
+                print("Computing FID with clean mode for CIFAR-10")
+                fid_score = fid.compute_fid(
+                    str(generated_samples_dir),
+                    dataset_name='cifar10',
+                    mode='clean',
+                    device=device,
+                    num_workers=4,
+                )
+                print(f"Successfully computed FID: {fid_score:.4f}")
+            except Exception as e:
+                print(f"Error computing FID: {e}")
+                raise
+                
         elif dataset_name == 'mnist':
             # MNIST might not be directly supported, try generic
             print("Note: MNIST FID computation may not be directly supported by clean-fid")
@@ -159,7 +167,7 @@ def infer(args):
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
     
     print(f"Loading checkpoint from {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     
     # Get training args and config
     train_args = checkpoint.get('args', {})

@@ -293,13 +293,13 @@ if __name__ == "__main__":
     
     # Training method
     parser.add_argument('--method', type=str, default='cfm',
-                       choices=['cfm', 'otcfm', 'sbcfm', 'ma_otcfm', 'ma_tcfm'],
-                       help='Training method: cfm, otcfm, sbcfm, ma_otcfm, or ma_tcfm')
+                       choices=['cfm', 'otcfm', 'sbcfm', 'ma_otcfm', 'ma_tcfm', 'ma3_tcfm'],
+                       help='Training method: cfm, otcfm, sbcfm, ma_otcfm, ma_tcfm, or ma3_tcfm')
     
     # Model-aware method (for ma_otcfm/ma_tcfm)
     parser.add_argument('--ma_method', type=str, default='downsample_2x',
-                       choices=['downsample_2x', 'low_pass'],
-                       help='Model-aware transformation method (for ma_otcfm/ma_tcfm): downsample_2x (default) or low_pass')
+                       choices=['downsample_2x', 'downsample_3x', 'low_pass'],
+                       help='Model-aware transformation method (for ma_otcfm/ma_tcfm): downsample_2x (default), downsample_3x, or low_pass. Note: ma3_tcfm always uses downsample_3x')
     
     # Dataset
     parser.add_argument('--dataset', type=str, default='moons',

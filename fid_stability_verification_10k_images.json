@@ -1,0 +1,23 @@
+{
+  "cfm": {
+    "name": "CFM",
+    "fid": 101.097,
+    "num_images": 10000,
+    "num_steps": 5,
+    "iteration": 10000
+  },
+  "ma_tcfm": {
+    "name": "MA-TCFM",
+    "fid": 89.3564,
+    "num_images": 10000,
+    "num_steps": 5,
+    "iteration": 10000
+  },
+  "otcfm": {
+    "name": "OT-CFM",
+    "fid": 86.0511,
+    "num_images": 10000,
+    "num_steps": 5,
+    "iteration": 10000
+  }
+}

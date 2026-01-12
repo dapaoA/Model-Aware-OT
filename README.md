@@ -176,3 +176,11 @@ After inference, the output directory will contain:
 - `sample_*.png`: Individual sample images (for image datasets)
 - `generated_samples.png`: Scatter plot (for 2D datasets)
 - `fid_score.txt`: FID score (if computed)
+
+
+For linux
+
+cd /workspace/Model-Aware-OT
+bash setup_env.sh
+source venv/bin/activate
+pip install -r requirements.txt
