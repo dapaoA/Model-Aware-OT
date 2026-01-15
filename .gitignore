@@ -173,7 +173,7 @@ slurm*.out
 *.csv
 
 # Images
-*.png
+# *.png  # Allow PNG files to be committed
 *.svg
 *.gif
 *.jpg
