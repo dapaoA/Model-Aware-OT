@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 import torch
+import torchvision.transforms as transforms
 import torchvision.utils as vutils
 from torch.utils.tensorboard import SummaryWriter
 from torchdyn.core import NeuralODE
@@ -50,7 +51,14 @@ def generate_samples(model, dataset_name, device, num_samples, num_steps, save_d
             samples = traj[-1]  # Final samples
             
             # Denormalize and save
-            samples = (samples + 1) / 2
+            if dataset_name == 'cifar10':
+                # CIFAR10: mean=(0.4914, 0.4822, 0.4465), std=(0.2470, 0.2435, 0.2616)
+                mean = torch.tensor([0.4914, 0.4822, 0.4465], device=device).view(1, 3, 1, 1)
+                std = torch.tensor([0.2470, 0.2435, 0.2616], device=device).view(1, 3, 1, 1)
+                samples = samples * std + mean
+            elif dataset_name == 'mnist':
+                # MNIST: mean=(0.5,), std=(0.5,)
+                samples = (samples + 1) / 2
             samples = samples.clamp(0, 1)
             
             # Save individual images

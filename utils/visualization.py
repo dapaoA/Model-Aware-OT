@@ -74,7 +74,14 @@ def visualize_denoising_process(model, dataset_name, device, save_path, num_nois
                 for j, step_idx in enumerate(vis_indices):
                     img = traj[step_idx, i].cpu()
                     # Denormalize
-                    img = (img + 1) / 2
+                    if dataset_name == 'cifar10':
+                        # CIFAR10: mean=(0.4914, 0.4822, 0.4465), std=(0.2470, 0.2435, 0.2616)
+                        mean = torch.tensor([0.4914, 0.4822, 0.4465]).view(3, 1, 1)
+                        std = torch.tensor([0.2470, 0.2435, 0.2616]).view(3, 1, 1)
+                        img = img * std + mean
+                    elif dataset_name == 'mnist':
+                        # MNIST: mean=(0.5,), std=(0.5,)
+                        img = (img + 1) / 2
                     img = img.clamp(0, 1)
                     
                     if dataset_name == 'cifar10':
