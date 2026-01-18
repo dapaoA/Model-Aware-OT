@@ -298,8 +298,8 @@ if __name__ == "__main__":
     
     # Model-aware method (for ma_otcfm/ma_tcfm)
     parser.add_argument('--ma_method', type=str, default='downsample_2x',
-                       choices=['downsample_2x', 'downsample_3x', 'low_pass'],
-                       help='Model-aware transformation method (for ma_otcfm/ma_tcfm): downsample_2x (default), downsample_3x, or low_pass. Note: ma3_tcfm always uses downsample_3x')
+                       choices=['downsample_2x', 'downsample_3x', 'low_pass', 'inception', 'dct_4x4', 'dct_8x8'],
+                       help='Model-aware transformation method (for ma_otcfm/ma_tcfm): downsample_2x (default), downsample_3x, low_pass, inception, dct_4x4, or dct_8x8. Note: ma3_tcfm always uses downsample_3x')
     
     # Dataset
     parser.add_argument('--dataset', type=str, default='moons',
