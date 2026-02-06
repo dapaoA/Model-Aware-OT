@@ -1232,6 +1232,32 @@ class MA_ExactOT(ExactOptimalTransportConditionalFlowMatcher):
         x0_transformed = self.M(x0)
         x1_transformed = self.M(x1)
         
+        # For DCT methods, normalize each frequency component within its batch
+        # Normalize x0 and x1 separately, each to have zero mean and unit std per frequency
+        if self.ma_method in ['dct_4x4', 'dct_8x8']:
+            # Normalize x0: for each frequency position, normalize across batch
+            # x0_transformed shape: (B, C * num_coeffs)
+            # Normalize along batch dimension (dim=0) for each frequency position (dim=1)
+            # This ensures each frequency component in x0 has mean=0, std=1 across the batch
+            x0_mean = x0_transformed.mean(dim=0, keepdim=True)  # (1, C * num_coeffs)
+            x0_std = x0_transformed.std(dim=0, keepdim=True)  # (1, C * num_coeffs)
+            # Avoid division by zero
+            x0_std = torch.clamp(x0_std, min=1e-8)
+            x0_transformed = (x0_transformed - x0_mean) / x0_std
+            
+            # Normalize x1: for each frequency position, normalize across batch
+            # This ensures each frequency component in x1 has mean=0, std=1 across the batch
+            x1_mean = x1_transformed.mean(dim=0, keepdim=True)  # (1, C * num_coeffs)
+            x1_std = x1_transformed.std(dim=0, keepdim=True)  # (1, C * num_coeffs)
+            # Avoid division by zero
+            x1_std = torch.clamp(x1_std, min=1e-8)
+            x1_transformed = (x1_transformed - x1_mean) / x1_std
+            
+            # Note: The normalization is done separately for x0 and x1, which means
+            # each frequency position is normalized independently within its own batch.
+            # This preserves the relative structure within each batch but may not
+            # fully account for the scale differences between x0 and x1.
+        
         # Get OT plan using transformed coordinates
         pi = self.ot_sampler.get_map(x0_transformed, x1_transformed)
         

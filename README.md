@@ -184,3 +184,25 @@ cd /workspace/Model-Aware-OT
 bash setup_env.sh
 source venv/bin/activate
 pip install -r requirements.txt
+
+## TensorBoard Visualization
+
+To visualize training logs using TensorBoard:
+
+```bash
+# View training logs from a specific model
+tensorboard --logdir=models/cifar10_cfm/cfm_cifar10/tensorboard
+
+# Or specify a different model's tensorboard directory
+tensorboard --logdir=models/cifar10_otcfm/otcfm_cifar10/tensorboard
+
+# You can also specify a custom port (default is 6006)
+tensorboard --logdir=models/cifar10_cfm/cfm_cifar10/tensorboard --port=6007
+```
+
+Then open your browser and navigate to `http://localhost:6006` (or the port you specified).
+
+The TensorBoard logs contain:
+- Training loss over iterations
+- Model checkpoint information
+- Other training metrics logged during training

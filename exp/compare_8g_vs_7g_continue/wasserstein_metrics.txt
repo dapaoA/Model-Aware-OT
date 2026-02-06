@@ -1,0 +1,10 @@
+Wasserstein distance (generated vs true 8 gaussians)
+  (per-dimension and L2-combined)
+
+8g from scratch:  W_dim0=0.365833  W_dim1=0.615320  W_combined=0.715858
+7g then continue: W_dim0=0.442111  W_dim1=0.270481  W_combined=0.518288
+
+Checkpoints used:
+  8g from scratch:  models\cfm_moons_to_8gaussians\checkpoint_iter_20000.pt
+  7g then continue: models\cfm_moons_to_7gaussians_continue_8g\checkpoint_iter_1000.pt
+  (7g then continue 必须用 train_continue.py 生成的 .../moons_to_7gaussians_continue_8g/ 下的 checkpoint)

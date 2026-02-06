@@ -10,6 +10,16 @@ moons:
   dim: 2
   width: 64
 
+# 2 moon -> 8 gaussian
+moons_to_8gaussians:
+  dim: 2
+  width: 64
+
+# 2 moon -> 7 gaussian (one center omitted for continue-learning experiments)
+moons_to_7gaussians:
+  dim: 2
+  width: 64
+
 # Image datasets
 cifar10:
   in_channels: 3

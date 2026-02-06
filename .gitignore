@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*.pyc
 *$py.class
 
 # C extensions
@@ -160,6 +161,10 @@ examples/
 
 # Slurm
 slurm*.out
+
+# Generated samples
+generated_samples/
+exp/generated_samples*/
 
 # Data and models
 *.pt

@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torchdyn.core import NeuralODE
 
-from torchcfm.utils import sample_8gaussians
+from torchcfm.utils import sample_8gaussians, sample_moons
 
 
 def visualize_denoising_process(model, dataset_name, device, save_path, num_noises=5, num_steps=50, step_interval=5, seed=42):
@@ -103,7 +103,9 @@ def visualize_denoising_process(model, dataset_name, device, save_path, num_nois
             num_samples = num_noises
             
             # Sample from source distribution with fixed seed
-            if dataset_name == 'moons':
+            if dataset_name in ('moons_to_8gaussians', 'moons_to_7gaussians'):
+                x0 = sample_moons(num_samples).to(device)
+            elif dataset_name == 'moons':
                 x0 = sample_8gaussians(num_samples).to(device)
             else:  # 8gaussians
                 x0 = sample_8gaussians(num_samples).to(device)

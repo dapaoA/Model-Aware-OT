@@ -14,7 +14,7 @@ from PIL import Image
 
 from model import create_model
 from utils import set_seed
-from torchcfm.utils import sample_8gaussians
+from torchcfm.utils import sample_8gaussians, sample_moons  # sample_7gaussians not needed for infer (we generate to 8g after continue)
 
 # Import clean-fid for FID computation
 try:
@@ -78,7 +78,9 @@ def generate_samples(model, dataset_name, device, num_samples, num_steps, save_d
             
         else:
             # 2D dataset
-            if dataset_name == 'moons':
+            if dataset_name in ('moons_to_8gaussians', 'moons_to_7gaussians'):
+                x0 = sample_moons(num_samples).to(device)
+            elif dataset_name == 'moons':
                 x0 = sample_8gaussians(num_samples).to(device)
             else:  # 8gaussians
                 x0 = sample_8gaussians(num_samples).to(device)
@@ -277,7 +279,7 @@ if __name__ == "__main__":
     
     # Dataset (optional, will use from checkpoint if available)
     parser.add_argument('--dataset', type=str, default=None,
-                       choices=['moons', '8gaussians', 'cifar10', 'mnist'],
+                       choices=['moons', '8gaussians', 'moons_to_8gaussians', 'moons_to_7gaussians', 'cifar10', 'mnist'],
                        help='Dataset name (optional, will use from checkpoint)')
     
     # Generation parameters
