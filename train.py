@@ -17,7 +17,7 @@ from model import create_model, load_model_config, create_default_config
 from utils import set_seed
 from utils.common import get_rng_states, set_rng_states
 from utils.visualization import visualize_denoising_process
-from torchcfm.utils import sample_moons, sample_8gaussians, sample_7gaussians
+from torchcfm.utils import sample_moons, sample_8gaussians, sample_7gaussians, sample_1moon
 
 
 def train(args):
@@ -221,6 +221,10 @@ def train(args):
                     x1 = sample_8gaussians(args.batch_size).to(device)
                 elif dataset_type == 'moons_to_7gaussians':
                     x1 = sample_7gaussians(args.batch_size).to(device)
+                elif dataset_type == '8g_to_2moons':
+                    x1 = sample_moons(args.batch_size).to(device)
+                elif dataset_type == '8g_to_1moon':
+                    x1 = sample_1moon(args.batch_size).to(device)
                 else:  # 8gaussians
                     x1 = sample_8gaussians(args.batch_size).to(device)
                 
@@ -307,7 +311,7 @@ if __name__ == "__main__":
     
     # Dataset
     parser.add_argument('--dataset', type=str, default='moons',
-                       choices=['moons', '8gaussians', 'moons_to_8gaussians', 'moons_to_7gaussians', 'cifar10', 'mnist'],
+                       choices=['moons', '8gaussians', 'moons_to_8gaussians', 'moons_to_7gaussians', '8g_to_2moons', '8g_to_1moon', 'cifar10', 'mnist'],
                        help='Dataset to use (moons_to_8gaussians = 2 moon -> 8 gaussian)')
     
     # Model config

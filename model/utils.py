@@ -117,6 +117,8 @@ def create_default_config(config_path):
         '8gaussians': {'dim': 2, 'width': 64},
         'moons_to_8gaussians': {'dim': 2, 'width': 64},
         'moons_to_7gaussians': {'dim': 2, 'width': 64},
+        '8g_to_2moons': {'dim': 2, 'width': 64},
+        '8g_to_1moon': {'dim': 2, 'width': 64},
         'cifar10': {
             'in_channels': 3,
             'out_channels': 3,

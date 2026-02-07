@@ -80,7 +80,7 @@ def generate_samples(model, dataset_name, device, num_samples, num_steps, save_d
             # 2D dataset
             if dataset_name in ('moons_to_8gaussians', 'moons_to_7gaussians'):
                 x0 = sample_moons(num_samples).to(device)
-            elif dataset_name == 'moons':
+            elif dataset_name in ('moons', '8g_to_2moons', '8g_to_1moon'):
                 x0 = sample_8gaussians(num_samples).to(device)
             else:  # 8gaussians
                 x0 = sample_8gaussians(num_samples).to(device)
@@ -279,7 +279,7 @@ if __name__ == "__main__":
     
     # Dataset (optional, will use from checkpoint if available)
     parser.add_argument('--dataset', type=str, default=None,
-                       choices=['moons', '8gaussians', 'moons_to_8gaussians', 'moons_to_7gaussians', 'cifar10', 'mnist'],
+                       choices=['moons', '8gaussians', 'moons_to_8gaussians', 'moons_to_7gaussians', '8g_to_2moons', '8g_to_1moon', 'cifar10', 'mnist'],
                        help='Dataset name (optional, will use from checkpoint)')
     
     # Generation parameters

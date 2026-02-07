@@ -20,6 +20,14 @@ moons_to_7gaussians:
   dim: 2
   width: 64
 
+# 8 gaussian -> 2 moons / 1 moon (for continue-learning: 1moon then continue to 2moons)
+8g_to_2moons:
+  dim: 2
+  width: 64
+8g_to_1moon:
+  dim: 2
+  width: 64
+
 # Image datasets
 cifar10:
   in_channels: 3

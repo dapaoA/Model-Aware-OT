@@ -1,0 +1,16 @@
+Wasserstein distance
+
+vs true 2 moons:
+  2moons from scratch:  W=0.549717
+  1moon then continue:  W=1.877164
+  1moon then continue (prior):   W=0.358667
+  1moon then continue (efm):     W=0.714230
+vs true 1 moon:
+  8g->1moon:            W=0.261036
+
+Checkpoints:
+  2moons: models\cfm_8g_to_2moons\checkpoint_iter_20000.pt
+  1moon: models\cfm_8g_to_1moon\checkpoint_iter_20000.pt
+  continue: models\cfm_8g_to_1moon_continue_2moons\checkpoint_iter_5000.pt
+  continue_prior:   models\cfm_8g_to_1moon_continue_2moons_prior\checkpoint_iter_100.pt
+  continue_efm:     models\cfm_8g_to_1moon_continue_2moons_efm\checkpoint_iter_80.pt

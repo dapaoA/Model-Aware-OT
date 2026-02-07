@@ -206,3 +206,105 @@ The TensorBoard logs contain:
 - Training loss over iterations
 - Model checkpoint information
 - Other training metrics logged during training
+
+---
+
+## Continue Learning (1moon→2moons)
+
+### 1. 训练基础模型
+
+```bash
+# 训练 8g->2moons（从头训，作为对照）
+python train.py --dataset 8g_to_2moons --method cfm --iterations 20000 --save_iter 5000
+
+# 训练 8g->1moon（左月牙，作为 continue 的起点）
+python train.py --dataset 8g_to_1moon --method cfm --iterations 20000 --save_iter 5000
+```
+
+### 2. Continue Training（1moon→2moons）
+
+加载 8g->1moon 模型，只在新数据（右月牙）上继续训练，得到 8g->2moons：
+
+```bash
+python train_continue_2moons.py --checkpoint models/cfm_8g_to_1moon/checkpoint_iter_20000.pt
+```
+
+**Loss 选项** `--loss`：
+- `mse`（默认）：只用 flow matching loss
+- `prior`：L = L_B + λ·L_prior，prior-preservation 防遗忘
+- `distill`：L = L_B + λ·L_distill，蒸馏约束防遗忘
+- `efm`：EFM 加权方向，u = w_A·u_freeze + w_B·u_B
+
+```bash
+# MSE
+python train_continue_2moons.py --checkpoint models/cfm_8g_to_1moon/checkpoint_iter_20000.pt --loss mse --iterations 5000
+
+# Prior-preservation（防遗忘）
+python train_continue_2moons.py --checkpoint models/cfm_8g_to_1moon/checkpoint_iter_20000.pt --loss prior --lambda_prior 1.0 --iterations 5000
+
+# Distill
+python train_continue_2moons.py --checkpoint models/cfm_8g_to_1moon/checkpoint_iter_20000.pt --loss distill --lambda_distill 1.0 --iterations 5000
+
+# EFM composite
+python train_continue_2moons.py --checkpoint models/cfm_8g_to_1moon/checkpoint_iter_20000.pt --loss efm --iterations 5000
+```
+
+**常用参数**：
+- `--save_iter 0`（默认）：只在结束时保存
+- `--sample_vis_iter 1000`：每 1000 iter 画一次 inference 分布
+- `--sample_vis_num 2000`：inference 图的样本数
+
+### 3. 比较与可视化
+
+```bash
+# 只比较（使用已有 checkpoint）
+python script/compare_2moons_vs_1moon_continue.py
+
+# 指定各 checkpoint 路径
+python script/compare_2moons_vs_1moon_continue.py \
+  --checkpoint_2moons models/cfm_8g_to_2moons/checkpoint_iter_20000.pt \
+  --checkpoint_1moon models/cfm_8g_to_1moon/checkpoint_iter_20000.pt \
+  --checkpoint_continue models/cfm_8g_to_1moon_continue_2moons/checkpoint_iter_5000.pt
+
+# 加入 prior / distill / efm 结果
+python script/compare_2moons_vs_1moon_continue.py \
+  --checkpoint_continue_prior models/cfm_8g_to_1moon_continue_2moons_prior/checkpoint_iter_5000.pt \
+  --checkpoint_continue_efm models/cfm_8g_to_1moon_continue_2moons_efm/checkpoint_iter_5000.pt
+
+# 从零训练再比较（含 continue）
+python script/compare_2moons_vs_1moon_continue.py --train --iterations_2moons 20000 --iterations_1moon 20000 --iterations_continue 5000
+
+# 同时训练 prior 和 efm 再比较
+python script/compare_2moons_vs_1moon_continue.py --train --train_prior --train_efm --iterations_continue 5000
+```
+
+**输出**：
+- `exp/compare_2moons_vs_1moon_continue/compare_2moons_vs_1moon_continue.png`：分栏图
+- `exp/compare_2moons_vs_1moon_continue/compare_four_overlay.png`：多方法叠加图
+- `exp/compare_2moons_vs_1moon_continue/wasserstein_metrics.txt`：Wasserstein 距离
+
+**方向可视化**（对比 model、EFM、A、B、composite 方向）：
+```bash
+python script/visualize_direction_comparison.py
+# 输出: exp/visualize_direction_comparison/directions.png, directions_single_x1.png, directions_cosine.png
+```
+
+---
+
+## Continue Learning (7g→8g)
+
+2moons→7gaussians 再继续训练到 8gaussians：
+
+```bash
+# 训练 2moons->8g（对照）
+python train.py --dataset moons_to_8gaussians --method cfm --iterations 20000 --save_iter 5000
+
+# 训练 2moons->7g（缺一个中心）
+python train.py --dataset moons_to_7gaussians --method cfm --iterations 20000 --save_iter 5000
+
+# Continue: 7g -> 8g
+python train_continue.py --checkpoint models/cfm_moons_to_7gaussians/checkpoint_iter_20000.pt --iterations 100
+
+# 比较与可视化
+python script/compare_8g_vs_7g_continue.py
+```

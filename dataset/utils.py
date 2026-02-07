@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from torchcfm.utils import sample_8gaussians, sample_7gaussians, sample_moons
+from torchcfm.utils import sample_8gaussians, sample_7gaussians, sample_moons, sample_1moon, sample_left_moon
 
 
 def get_dataset(dataset_name, batch_size, data_dir='./data'):
@@ -72,6 +72,10 @@ def get_dataset(dataset_name, batch_size, data_dir='./data'):
         return None, 'moons_to_8gaussians'
     elif dataset_name == 'moons_to_7gaussians':
         return None, 'moons_to_7gaussians'
+    elif dataset_name == '8g_to_2moons':
+        return None, '8g_to_2moons'
+    elif dataset_name == '8g_to_1moon':
+        return None, '8g_to_1moon'
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}")
 
@@ -95,6 +99,10 @@ def sample_data(dataset_name, batch_size, device):
         return sample_moons(batch_size).to(device)
     elif dataset_name == 'moons_to_7gaussians':
         return sample_7gaussians(batch_size).to(device)
+    elif dataset_name == '8g_to_2moons':
+        return sample_moons(batch_size).to(device)
+    elif dataset_name == '8g_to_1moon':
+        return sample_left_moon(batch_size).to(device)  # 1 moon = 左边月牙
     else:
         raise ValueError(f"Cannot sample from {dataset_name} directly. Use get_dataset() for image datasets.")
 
@@ -121,6 +129,9 @@ def sample_source_distribution(dataset_name, num_samples, device):
     elif dataset_name == 'moons_to_7gaussians':
         # 2 moon -> 7 gaussian (one missing): source is moons
         return sample_moons(num_samples).to(device)
+    elif dataset_name in ('8g_to_2moons', '8g_to_1moon'):
+        # 8 gaussian -> 2 moons or 1 moon: source is 8 gaussians
+        return sample_8gaussians(num_samples).to(device)
     else:
         # For image datasets, source is standard normal
         raise ValueError(f"Use torch.randn_like() for image datasets, not this function")

@@ -105,7 +105,7 @@ def visualize_denoising_process(model, dataset_name, device, save_path, num_nois
             # Sample from source distribution with fixed seed
             if dataset_name in ('moons_to_8gaussians', 'moons_to_7gaussians'):
                 x0 = sample_moons(num_samples).to(device)
-            elif dataset_name == 'moons':
+            elif dataset_name in ('moons', '8g_to_2moons', '8g_to_1moon'):
                 x0 = sample_8gaussians(num_samples).to(device)
             else:  # 8gaussians
                 x0 = sample_8gaussians(num_samples).to(device)
