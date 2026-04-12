@@ -1,0 +1,130 @@
+% 编译建议: xelatex summary.tex （需安装 ctex 宏集）
+\documentclass[UTF8]{ctexart}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{amsmath,amssymb}
+\geometry{margin=2.2cm}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+
+\title{Sinkhorn 传输矩阵与模型感知 OT：问题—方案—理论要点—难点—尝试（工作笔记）}
+\author{（与 ChatGPT 讨论整理；见文末说明）}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+本文档概括本仓库相关研究方向：在流匹配 / 条件流匹配（CFM、OT-CFM）中如何获得或学习\textbf{样本间耦合（transport plan）}，以及 \textbf{Sinkhorn 归一化}在注意力与 OT 输出中的不同角色。正文在原有「问题—方案—难点—尝试」之外，增补一节\textbf{Sinkhorn 与双随机的理论要点}（$u,v$ 与 $P$ 的关系、何时 doubly stochastic、有限步迭代的近似性），以及一节\textbf{可微配对层}（梯度经 $X^\ast=PX$ 回传、低秩 score、Hungarian+STE、用网络近似 Sinkhorn 的可行边界）。实现与实验仍指向仓库内脚本。
+\end{abstract}
+
+\section{想解决什么问题}
+
+\begin{itemize}
+  \item \textbf{OT-CFM 与配对质量。}
+    在 batch 内用最优传输思想为源点与目标点配对，可改善独立配对下的路径方差；精确 minibatch OT（如 EMD）代价高或需外部求解器，且与端到端「可学习配对」的需求不完全一致。
+  \item \textbf{可学习的传输计划（assignment layer）。}
+    目标不一定是「最优运输解」本身，而是一个\textbf{可训练配对层}：网络产生得分 $S_\theta(x,y)$（或等价结构），再变为满足边际的 $P$，下游损失通过 $X^\ast=PX$（或加权聚合）反传，使配对结构与任务对齐。
+  \item \textbf{概念厘清：Sinkhorn 出现在不同位置。}
+    同一数学工具既可用于 \textbf{Sinkformer}（用 Sinkhorn 替代 softmax，得到双随机 attention），也可用于 \textbf{OT 型模块}（对 $N\times N$ 的 $x_0$--$x_1$ 亲和度矩阵做 Sinkhorn，直接输出 plan）。两者目标与 shape 约定不同（见 \texttt{experiments/architecture\_comparison.md}）。
+\end{itemize}
+
+\section{采用的方案（概要）}
+
+\begin{itemize}
+  \item \textbf{OTTransformer / 验证脚本。}
+    对两批点集编码、自注意力建上下文，再构造跨集得分 $S_{ij}$，最后 \texttt{log\_sinkhorn} 得到边际为 $1/N$ 的 plan $P$（总质量为 1）。见 \texttt{experiments/ot\_transformer\_verify.py} 与架构对比文档。
+  \item \textbf{Sinkformer 式 pairer + 2D CFM 对比实验。}
+    \texttt{experiments/ot\_cfm\_vs\_sinkformer\_2d.py}：一侧为 OT-CFM（精确 minibatch 配对 + 标准 FM loss）；另一侧为可学习 plan（Sinkhorn）+ 可选 Hungarian 硬匹配与 straight-through（STE），并支持 \texttt{--soft-pair}、\texttt{--frozen-pairer}、共享或逐对时间 $t$ 等消融。
+  \item \textbf{Sinkformer 注意力实现。}
+    \texttt{model/sinkformer.py}：多头自注意力中将 softmax 换为对数域 Sinkhorn 迭代，使权重矩阵（每头）近似双随机；与「输出 OT plan」的模块在任务定义上不同。
+\end{itemize}
+
+\section{Sinkhorn 里 $u,v$ 如何得到传输矩阵；何时 doubly stochastic}
+
+\subsection{公式：对角缩放夹核矩阵，而非外积 $uv^\top$}
+
+熵正则 OT 在约束 $P\mathbf{1}=a$、$P^\top\mathbf{1}=b$（$P\ge 0$）下，最优性条件给出
+\[
+P_{ij}=u_i\,K_{ij}\,v_j,\qquad K_{ij}=\exp(-C_{ij}/\varepsilon),
+\]
+即矩阵形式 \textbf{$P=\mathrm{Diag}(u)\,K\,\mathrm{Diag}(v)$}。\\
+\textbf{注意：}这与秩一外积 $uv^\top$ 不是同一对象；$u,v$ 由边际方程确定，几何意义是对正核 $K$ 做交替行/列缩放（Sinkhorn--Knopp）。
+
+\subsection{是否一定 doubly stochastic？}
+
+\textbf{一般 OT：}只保证指定边缘 $a,b$，即行和为 $a_i$、列和为 $b_j$，\textbf{不}等同于「每行每列和均为 1」的经典 doubly stochastic。\\
+\textbf{方阵 + 均匀边际：}若 $P\in\mathbb{R}^{n\times n}$ 且 $a=b=\frac1n\mathbf{1}$（总质量 1），则 $P$ 为均匀边际下的双随机；若要与「行和列和均为 1」的常用定义对齐，差一个整体因子 $n$（缩放约定与代码实现需一致）。
+
+\subsection{有限步迭代}
+
+理论极限下（正性、可缩放等条件满足）Sinkhorn 收敛到满足边际的 $P$。\\
+\textbf{有限步：}实现中只做 $K$ 次迭代时，边际通常仅为\textbf{近似}满足；许多工作（如围绕 mHC 的讨论）明确将「截断 Sinkhorn」视为\textbf{近似投影}到 Birkhoff 多面体，而非严格落在集合内。
+
+\subsection{「任意输入都输出双随机」的参数化（概念层）}
+
+\begin{itemize}
+  \item \textbf{正矩阵 + Sinkhorn：} $M_{ij}=\exp(S_{ij}/\tau)$（或任意正 $M$），再行列归一化；极限下满足给定边际。实用、可微，但依赖迭代且有限步近似。
+  \item \textbf{Birkhoff--von Neumann：}双随机矩阵为置换矩阵的凸包；用单纯形权重组合置换可\textbf{严格}保证双随机，但全体置换维度随 $n!$ 增长，仅小 $n$ 上朴素可行。
+  \item \textbf{简单秩一 $P=ab^\top$：}若同时要求非负与（均匀边际下）双随机，正秩一情形会退化为接近\textbf{均匀矩阵} $\frac1n\mathbf{11}^\top$，无法表达有区分度的匹配。若写 $X^\ast=ab^\top X$，其效果更接近\textbf{低秩混合算子}（先全局混合再广播），而非一般意义上的配对矩阵。
+\end{itemize}
+
+\section{可微配对：梯度、低秩 score、STE 与「学习投影」}
+
+\subsection{损失经 $X^\ast=PX$ 时的梯度链}
+
+若 $X^\ast=PX$，$P=\mathrm{Sinkhorn}(S_\theta)$，且损失 $\mathcal{L}$ 依赖 $X^\ast$，则链式法则给出
+\[
+\frac{\partial \mathcal{L}}{\partial P}=\frac{\partial \mathcal{L}}{\partial X^\ast}\,X^\top,
+\]
+再经 Sinkhorn 层对 $S$ 的雅可比回传至 $\theta$。\\
+\textbf{要点：}前向若使用配对后的 $P$，则不能把用于损失的 $P$ 随意 \texttt{detach} 又指望梯度更新 score。\\
+若对 Sinkhorn 做完全展开自动微分，反向代价与步数线性相关；文献中有\textbf{隐式微分}等做法，减轻展开步数带来的数值与内存问题（可作后续改进方向）。
+
+\subsection{版本 B：Hungarian 硬前向 + STE 软反向}
+
+常用构造：$P_{\mathrm{soft}}=\mathrm{Sinkhorn}(S/\tau)$，$P_{\mathrm{hard}}=\mathrm{Hungarian}(P_{\mathrm{soft}})$，
+\[
+\tilde P = P_{\mathrm{hard}}-\mathrm{sg}(P_{\mathrm{soft}})+P_{\mathrm{soft}}.
+\]
+前向用 $\tilde P$（语义上接近硬配对），反向梯度经 $P_{\mathrm{soft}}$ 流动。\textbf{梯度有偏}，但工程上常能跑通；可靠性依赖温度 $\tau$、Sinkhorn 步数及任务对离散配对的敏感度，需用消融与边际误差监控验证，而非假设无偏。
+
+\subsection{低秩 $S=AB^\top$ 能省什么、不能省什么}
+
+低秩参数化可减少参数量并施加「两侧 embedding 相似度」的归纳偏置。但 \textbf{$K=\exp(S/\tau)$ 一般不再低秩}，标准 Sinkhorn 仍对完整 $n\times n$ 矩阵做行列归一化，算力与显存主项往往仍在。若要真正降低 $n^2$ 级代价，需结构更强的做法（如 slot 上小块 OT、$AMB^\top$ 式两级结构、或专门低秩 coupling 算法），而不只是把 $S$ 写成 $AB^\top$。
+
+\subsection{用神经网络近似 Sinkhorn 再冻结？}
+
+\textbf{思路：}训练 $g_\phi$ 使 $g_\phi(S)\approx \mathrm{Sinkhorn}(S)$，再冻结 $g_\phi$，主任务只训产生 $S$ 的网络。\\
+\textbf{风险：}学到的是\textbf{训练分布上}的近似投影，分布漂移、温度或维度变化会失效；近似边际误差被固定，主网络无法修正投影器本身。\\
+\textbf{更稳折中：}将 $g_\phi$ 视为 \textbf{warm-start / 预条件}，再接 \textbf{少量（如 1--3）步} Sinkhorn 校正，在速度与边际近似之间折中；这与 amortized OT / learned initializer 的常见用法一致。
+
+\section{主要难点}
+
+\begin{itemize}
+  \item \textbf{离散指派与梯度。}
+    Hungarian 为离散；STE 或软 plan 在「前向语义」与「反传信号」之间折中，且 STE 有偏。
+  \item \textbf{Sinkhorn：近似边际与截断迭代。}
+    步数过少或 $\tau$ 极端时，前向语义与「双随机/边际」承诺偏离；展开反向时步数影响梯度质量与开销。
+  \item \textbf{联合训练与非凸性。}
+    pairer 与 flow 纠缠；\texttt{--frozen-pairer} 等用于归因。
+  \item \textbf{边际与缩放约定。}
+    attention 与 OT plan 的总质量、行和列和约定需与损失一致（见 \texttt{architecture\_comparison.md}）。
+\end{itemize}
+
+\section{如何尝试解决（仓库中的对应做法）}
+
+\begin{itemize}
+  \item \textbf{对比基线：} OT-CFM 精确配对 vs 学习 plan + Sinkhorn（\texttt{ot\_cfm\_vs\_sinkformer\_2d.py}）。
+  \item \textbf{可微与硬指派：} 默认 Hungarian + STE；\texttt{--soft-pair} 纯软对照。
+  \item \textbf{消融 pairer：} \texttt{--frozen-pairer} 检验失败来自配对还是流网络。
+  \item \textbf{架构澄清：} Standard Transformer / Sinkformer / OTTransformer 对比表（\texttt{architecture\_comparison.md}）。
+  \item \textbf{实践优先级（与讨论一致）：} 先软 Sinkhorn（或现有 STE）跑通；若对步数/$\tau$/反传敏感，再试隐式微分或 warm-start + 少量校正；小 $n$ 再考虑置换凸组合等 exact 参数化。
+\end{itemize}
+
+\section{关于 ChatGPT 对话链接}
+
+对话标题涉及「Sinkhorn Transport Matrix」。公开分享页
+\href{https://chatgpt.com/share/69da56c9-96c8-83a4-ad19-80d975ce2e02}{chatgpt.com/share/69da56c9-96c8-83a4-ad19-80d975ce2e02}
+在未登录状态下无法抓取正文；\textbf{第 3--4 节}已按后续讨论（$u,v$ 与 $P$、双随机条件、低秩与梯度、STE、学习投影器）并入本文档。若需与原文逐句对齐，可将对话导出为 \texttt{sumerize\_latex/chatgpt\_export.txt} 再增补。
+
+\end{document}

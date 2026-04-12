@@ -1,0 +1,60 @@
+======================================================================
+TREE CFM v3 REPORT — Fair Comparison with Fixed Positional Encoding
+======================================================================
+Date  : 2026-03-28 15:29:33  Device: cuda
+Iters : 15000  Batch: 512  LR: 0.001
+
+WHY v3 IS FAIRER THAN v2
+------------------------
+v2 used learnable nn.Embedding for all methods -> both OldMethod and
+NewMethod had extra trainable params in the embedding. Difference in
+performance could be due to embedding quality, not time-conditioning.
+
+v3 uses a FIXED sinusoidal TreePosEnc (0 trainable params):
+  OldMethod: only velocity MLP trains (pos_enc is frozen buffer)
+  NewMethod: velocity MLP + ContextTimeEmb trains (~1.5K extra params)
+  The only structural difference is whether t is fused with pos_enc.
+
+FIXED POSITIONAL ENCODING: TreePosEnc
+--------------------------------------
+For each branch c, encodes its child-index path from root:
+  path[c] = [k1, k2, k3, k4]  where kd = child position at depth d
+  encode(kd) = [sin(kd/2 * pi * f) for f in [1,2,4,8]]
+               + [cos(kd/2 * pi * f) for f in [1,2,4,8]]
+  -> 2*4 dims/level * 4 levels = 32 dims total, NO training
+
+TRAINABLE PARAMETERS
+--------------------
+  NoContext   : 33,794 trainable params
+  OldMethod   : 37,890 trainable params
+  NewMethod   : 40,218 trainable params
+  (ContextTimeEmb alone: 2456 params — time_enc + fusion)
+
+RESULTS
+-------
+
+NoContext:
+  Mean dist-to-branch : 3.8964
+  Mean straightness   : 0.9852
+    Depth 1: dist=3.6423  straight=0.9832
+    Depth 2: dist=3.3074  straight=0.9864
+    Depth 3: dist=3.6787  straight=0.9851
+    Depth 4: dist=4.9391  straight=0.9852
+
+OldMethod:
+  Mean dist-to-branch : 0.0591
+  Mean straightness   : 0.9991
+    Depth 1: dist=0.0448  straight=0.9965
+    Depth 2: dist=0.0546  straight=0.9990
+    Depth 3: dist=0.0600  straight=0.9995
+    Depth 4: dist=0.0696  straight=0.9998
+
+NewMethod:
+  Mean dist-to-branch : 0.0664
+  Mean straightness   : 0.9990
+    Depth 1: dist=0.0498  straight=0.9964
+    Depth 2: dist=0.0666  straight=0.9988
+    Depth 3: dist=0.0684  straight=0.9995
+    Depth 4: dist=0.0714  straight=0.9998
+
+======================================================================

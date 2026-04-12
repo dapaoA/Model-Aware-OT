@@ -38,11 +38,14 @@ def eight_normal_sample(n, dim, scale=1, var=1):
 MOON_NOISE = 0.05
 
 
-def sample_moons(n):
-    """Sample 2 moons (both arcs). Same noise=0.05 as sample_1moon for consistency."""
+def sample_moons(n, random_state=None):
+    """Sample 2 moons (both arcs). Same noise=0.05 as sample_1moon for consistency.
+
+    random_state: passed to sklearn make_moons when available (int or np.random.RandomState).
+    """
     try:
         from sklearn.datasets import make_moons
-        X, _ = make_moons(n_samples=n, noise=MOON_NOISE, random_state=None)
+        X, _ = make_moons(n_samples=n, noise=MOON_NOISE, random_state=random_state)
         out = torch.from_numpy(X.astype(np.float32)) * 3 - 1
         return out.float()
     except ImportError:

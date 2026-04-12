@@ -1,0 +1,70 @@
+======================================================================
+TREE CFM v2 — REPORT
+======================================================================
+Date   : 2026-03-28 14:09:50
+Device : cuda   Iters: 15000   Batch: 512
+
+TREE STRUCTURE
+--------------
+24 branch segments, 4 depth levels.
+Irregular branching: root has 3 children.
+  Depth-2 parents: L has 2, C has 3, R has 1 (!) child.
+  Depth-3 parents: LL has 2, LR has 1, CL has 1, CC has 2, CR has 0 (leaf!), R1 has 3.
+  Depth-4 parents: LLL has 2, CCL has 3, R13 has 1, others are leaves.
+Points sampled ALONG all segments proportional to segment length.
+
+EMBEDDING
+---------
+HierBranchEmb: emb(c) = cat([E1[anc1], E2[anc2], E3[anc3], E4[anc4]])
+  Each Ed is a learnable table.  Pad token = zero vector.
+  emb_dim_per_level=10,  total emb_dim=40
+
+KEY COMPARISON
+--------------
+OldMethod: receives [x, t, emb(c)]  -- t and context are INDEPENDENT channels.
+NewMethod: receives [x, e(t)]        -- e(t) = fusion(emb(c), phi(t)).
+           The velocity net NEVER sees raw t; only the context-gated version.
+
+RESULTS
+-------
+
+NoContext:
+  Overall dist-to-branch : 3.9376
+  Overall straightness   : 0.9851
+    Depth 1: dist=3.8048  straight=0.9850
+    Depth 2: dist=3.2454  straight=0.9856
+    Depth 3: dist=3.7992  straight=0.9852
+    Depth 4: dist=4.9036  straight=0.9843
+
+OldMethod:
+  Overall dist-to-branch : 0.0528
+  Overall straightness   : 0.9990
+    Depth 1: dist=0.0412  straight=0.9961
+    Depth 2: dist=0.0476  straight=0.9988
+    Depth 3: dist=0.0561  straight=0.9995
+    Depth 4: dist=0.0589  straight=0.9999
+
+NewMethod:
+  Overall dist-to-branch : 0.0536
+  Overall straightness   : 0.9989
+    Depth 1: dist=0.0456  straight=0.9955
+    Depth 2: dist=0.0583  straight=0.9987
+    Depth 3: dist=0.0512  straight=0.9996
+    Depth 4: dist=0.0564  straight=0.9998
+
+WHAT TO LOOK FOR IN FIGURES
+----------------------------
+fig0: Tree topology. Points lie ALONG branches (not just at tips).
+fig1: Trajectories for 4 branches at different depths.
+      NoContext: flows mix and cross -- cannot distinguish branches.
+      OldMethod/NewMethod: flows separate cleanly by branch.
+fig2: e(t) vs time coloured by depth level.
+      Different depth levels should trace different curves.
+      Branches at same depth but different sub-trees should also differ.
+fig3: PCA of e(t). Classes (branches) should form distinct clusters.
+      As t changes (shape), each branch moves along its own trajectory.
+fig4: Per-branch dist-to-correct-branch heatmap.
+      NoContext should be uniformly high.
+      OldMethod/NewMethod should be low, especially at shallow depths.
+fig5: Loss curves.
+======================================================================
