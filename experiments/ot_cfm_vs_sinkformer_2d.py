@@ -17,10 +17,17 @@ Soft training only if: --soft-pair  (then P_fm = P, full grad, no STE)
 Time sampling: **one shared** t ~ Uniform(0,1) per step (same for all pairs in the batch).
   Use --per-pair-t for independent t ~ U(0,1) per pair.
 
+Outputs under --outdir (created automatically):
+  viz_panels/step{N}.png          — 6-panel training figure
+  viz_trajectories/step{N}.png  — if --viz-trajectories
+  viz_quiver/step{N}.png        — if --viz-uv-quiver (theory v vs pred u)
+  checkpoints/step{N}/          — if --save-ckpt-every > 0 (default 10000): net_*.pt + losses.npz
+  net_*.pt, losses.npz          — final weights at run root (unchanged)
+
 Run:
   python experiments/ot_cfm_vs_sinkformer_2d.py
   python experiments/ot_cfm_vs_sinkformer_2d.py --quick
-  python experiments/ot_cfm_vs_sinkformer_2d.py ... --viz-trajectories   # also step{N}_trajectories_t.png
+  python experiments/ot_cfm_vs_sinkformer_2d.py ... --viz-trajectories --viz-uv-quiver
 
 Frozen pairer ablation (train flow nets from scratch; pairer fixed as selection only):
   python experiments/ot_cfm_vs_sinkformer_2d.py --frozen-pairer experiments/results/sinkformer_2d_b64_v2/pairer.pt \\
@@ -44,6 +51,7 @@ sys.path.insert(0, _REPO)
 sys.path.insert(0, _EXP)
 from torchcfm.utils import sample_8gaussians, sample_moons
 from sinkformer_2d_pairer import SinkPairer
+from uv_quiver_2d_plot import save_uv_quiver_figure
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--steps',     type=int,   default=200_000)
@@ -87,12 +95,12 @@ parser.add_argument(
 )
 parser.add_argument(
     '--fig-save-every', '--ckpt-every', type=int, default=0, dest='fig_save_every',
-    help='If >0, save step{N:07d}.png (same 6-panel viz as vis_every) every N steps. '
+    help='If >0, save viz_panels/step{N:07d}.png (same 6-panel viz as vis_every) every N steps. '
          'Merged with vis_every so each matching step is saved once. Does not save .pt.',
 )
 parser.add_argument(
     '--viz-trajectories', action='store_true',
-    help='Whenever step*.png is saved, also save step{N}_trajectories_t.png: same initial '
+    help='Whenever panel viz is saved, also save viz_trajectories/step{N}.png: same initial '
          'x0 for OT vs Sinkformer, segment color = time t (like analyze_trajectories_t).',
 )
 parser.add_argument('--trajectory-paths', type=int, default=80, help='Number of particles for trajectory viz')
@@ -100,6 +108,14 @@ parser.add_argument('--trajectory-steps', type=int, default=200, help='Euler ste
 parser.add_argument(
     '--trajectory-seed', type=int, default=None,
     help='RNG seed for initial x0 in trajectory plot (default: vis_seed + 90210).',
+)
+parser.add_argument(
+    '--save-ckpt-every', type=int, default=10_000,
+    help='Save net_ot/net_sf/pairer + losses.npz under outdir/checkpoints/step{N}/ every N steps; 0 disables.',
+)
+parser.add_argument(
+    '--viz-uv-quiver', action='store_true',
+    help='When saving panel viz, also save viz_quiver/step{N}.png (theory v, pred u, residual u−v).',
 )
 args = parser.parse_args()
 
@@ -113,6 +129,13 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 os.makedirs(args.outdir, exist_ok=True)
 B = args.batch
 VIS_SEED = args.vis_seed if args.vis_seed is not None else args.seed
+
+PANEL_DIR = os.path.join(args.outdir, 'viz_panels')
+TRAJ_DIR = os.path.join(args.outdir, 'viz_trajectories')
+QUIVER_DIR = os.path.join(args.outdir, 'viz_quiver')
+CKPT_ROOT = os.path.join(args.outdir, 'checkpoints')
+for _sub in (PANEL_DIR, TRAJ_DIR, QUIVER_DIR, CKPT_ROOT):
+    os.makedirs(_sub, exist_ok=True)
 
 # ── Flow network ──────────────────────────────────────────────────
 class FlowNet(nn.Module):
@@ -240,10 +263,37 @@ def save_trajectory_viz(step, net_ot, net_sf):
 
         plt.suptitle('Same initial x0 trajectories: OT vs Sinkformer velocity fields', fontsize=11)
         plt.tight_layout()
-        out = os.path.join(args.outdir, f'step{step:07d}_trajectories_t.png')
+        out = os.path.join(TRAJ_DIR, f'step{step:07d}.png')
         fig.savefig(out, dpi=150, bbox_inches='tight')
         plt.close(fig)
         print(f'  traj viz -> {out}', flush=True)
+    finally:
+        torch.set_rng_state(r_cpu)
+        if r_cuda is not None:
+            torch.cuda.set_rng_state_all(r_cuda)
+        np.random.set_state(np_st)
+        net_ot.train()
+        net_sf.train()
+        if not FROZEN:
+            pairer.train()
+
+
+def save_uv_quiver_viz(step, net_ot, net_sf, pairer):
+    if not args.viz_uv_quiver:
+        return
+    r_cpu = torch.get_rng_state()
+    r_cuda = torch.cuda.get_rng_state_all() if DEVICE.type == 'cuda' else None
+    np_st = np.random.get_state()
+    try:
+        torch.manual_seed(int(VIS_SEED))
+        np.random.seed(int(VIS_SEED) % (2**32 - 1))
+        if DEVICE.type == 'cuda':
+            torch.cuda.manual_seed_all(int(VIS_SEED) % (2**32 - 1))
+        out = os.path.join(QUIVER_DIR, f'step{step:07d}.png')
+        save_uv_quiver_figure(
+            out, net_ot, net_sf, pairer, DEVICE, B, int(VIS_SEED), HARD_ST, args.per_pair_t,
+        )
+        print(f'  uv quiver -> {out}', flush=True)
     finally:
         torch.set_rng_state(r_cpu)
         if r_cuda is not None:
@@ -432,7 +482,7 @@ def _visualize_body(step, net_ot, net_sf, pairer, losses_ot, losses_sf, steps_lo
     ax.set_title(sf_pair_title)
 
     plt.tight_layout()
-    path = f'{args.outdir}/step{step:07d}.png'
+    path = os.path.join(PANEL_DIR, f'step{step:07d}.png')
     fig.savefig(path, dpi=130)
     plt.close(fig)
     del fig, axes
@@ -479,10 +529,15 @@ if args.vis_light:
 if args.viz_trajectories:
     print(
         f'viz-trajectories: paths={args.trajectory_paths} steps={args.trajectory_steps} '
-        f'-> step{{N}}_trajectories_t.png',
+        f'-> {TRAJ_DIR}/step{{N}}.png',
         flush=True,
     )
-print(f'Steps: {args.steps:,}  B={B}  vis_seed={VIS_SEED} (fixed for all step*.png)', flush=True)
+if args.viz_uv_quiver:
+    print(f'viz-uv-quiver: -> {QUIVER_DIR}/step{{N}}.png', flush=True)
+if args.save_ckpt_every > 0:
+    print(f'save-ckpt-every: {args.save_ckpt_every} -> {CKPT_ROOT}/step{{N}}/', flush=True)
+print(f'Panels -> {PANEL_DIR}/  |  vis_seed={VIS_SEED}', flush=True)
+print(f'Steps: {args.steps:,}  B={B}', flush=True)
 print('='*50, flush=True)
 
 # ── Train ─────────────────────────────────────────────────────────
@@ -544,6 +599,22 @@ for step in range(args.steps + 1):
                   frozen_pairer=FROZEN, hard_st=HARD_ST)
         if args.viz_trajectories:
             save_trajectory_viz(step, net_ot, net_sf)
+        if args.viz_uv_quiver:
+            save_uv_quiver_viz(step, net_ot, net_sf, pairer)
+
+    if args.save_ckpt_every > 0 and step > 0 and step % args.save_ckpt_every == 0:
+        ck = os.path.join(CKPT_ROOT, f'step{step:07d}')
+        os.makedirs(ck, exist_ok=True)
+        torch.save(net_ot.state_dict(), os.path.join(ck, 'net_ot.pt'))
+        torch.save(net_sf.state_dict(), os.path.join(ck, 'net_sf.pt'))
+        torch.save(pairer.state_dict(), os.path.join(ck, 'pairer.pt'))
+        np.savez(
+            os.path.join(ck, 'losses.npz'),
+            steps=np.asarray(steps_log, dtype=np.int64),
+            ot=np.asarray(losses_ot, dtype=np.float64),
+            sf=np.asarray(losses_sf, dtype=np.float64),
+        )
+        print(f'  checkpoint -> {ck}', flush=True)
 
 # ── Summary ───────────────────────────────────────────────────────
 n = min(50, len(losses_ot)//5)
